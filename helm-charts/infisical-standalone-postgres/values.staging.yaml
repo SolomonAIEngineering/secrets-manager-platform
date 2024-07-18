@@ -63,6 +63,7 @@ redis:
   architecture: standalone
 
 solomon:
+  # default values
   database:
     postgres:
       enabled: true
