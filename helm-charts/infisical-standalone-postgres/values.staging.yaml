@@ -20,8 +20,8 @@ infisical:
   kubeSecretRef: "infisical-secrets"
   service:
     annotations: {}
-    type: ClusterIP
-    nodePort: ""
+    type: NodePort
+    nodePort: "33001"
 
   resources:
     limits:
