@@ -1,31 +1,12 @@
 import { useEffect, useMemo } from "react";
 import { Control, Controller, UseFormSetValue, useWatch } from "react-hook-form";
-import { IconProp } from "@fortawesome/fontawesome-svg-core";
+import { faChevronDown, faChevronRight } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { motion } from "framer-motion";
-import { twMerge } from "tailwind-merge";
 
-import { Checkbox, Select, SelectItem } from "@app/components/v2";
+import { createNotification } from "@app/components/notifications";
+import { Checkbox, Select, SelectItem, Td, Tr } from "@app/components/v2";
 import { useToggle } from "@app/hooks";
-
-import { TFormSchema } from "./OrgRoleModifySection.utils";
-
-type Props = {
-  formName: keyof Omit<Exclude<TFormSchema["permissions"], undefined>, "workspace">;
-  isNonEditable?: boolean;
-  setValue: UseFormSetValue<TFormSchema>;
-  control: Control<TFormSchema>;
-  title: string;
-  subtitle: string;
-  icon: IconProp;
-};
-
-enum Permission {
-  NoAccess = "no-access",
-  ReadOnly = "read-only",
-  FullAccess = "full-acess",
-  Custom = "custom"
-}
+import { TFormSchema } from "@app/views/Org/RolePage/components/OrgRoleModifySection.utils";
 
 const PERMISSIONS = [
   { action: "read", label: "View" },
@@ -62,7 +43,7 @@ const BILLING_PERMISSIONS = [
   { action: "delete", label: "Remove payments" }
 ] as const;
 
-const getPermissionList = (option: Props["formName"]) => {
+const getPermissionList = (option: string) => {
   switch (option) {
     case "secret-scanning":
       return SECRET_SCANNING_PERMISSIONS;
@@ -77,20 +58,29 @@ const getPermissionList = (option: Props["formName"]) => {
   }
 };
 
-export const SimpleLevelPermissionOption = ({
-  isNonEditable,
-  setValue,
-  control,
-  formName,
-  subtitle,
-  title,
-  icon
-}: Props) => {
+type Props = {
+  isEditable: boolean;
+  title: string;
+  formName: keyof Omit<Exclude<TFormSchema["permissions"], undefined>, "workspace">;
+  setValue: UseFormSetValue<TFormSchema>;
+  control: Control<TFormSchema>;
+};
+
+enum Permission {
+  NoAccess = "no-access",
+  ReadOnly = "read-only",
+  FullAccess = "full-acess",
+  Custom = "custom"
+}
+
+export const RolePermissionRow = ({ isEditable, title, formName, control, setValue }: Props) => {
+  const [isRowExpanded, setIsRowExpanded] = useToggle();
+  const [isCustom, setIsCustom] = useToggle();
+
   const rule = useWatch({
     control,
     name: `permissions.${formName}`
   });
-  const [isCustom, setIsCustom] = useToggle();
 
   const selectedPermissionCategory = useMemo(() => {
     const actions = Object.keys(rule || {}) as Array<keyof typeof rule>;
@@ -110,9 +100,20 @@ export const SimpleLevelPermissionOption = ({
     else setIsCustom.off();
   }, [selectedPermissionCategory]);
 
+  useEffect(() => {
+    const isRowCustom = selectedPermissionCategory === Permission.Custom;
+    if (isRowCustom) {
+      setIsRowExpanded.on();
+    }
+  }, []);
+
   const handlePermissionChange = (val: Permission) => {
-    if (val === Permission.Custom) setIsCustom.on();
-    else setIsCustom.off();
+    if (val === Permission.Custom) {
+      setIsRowExpanded.on();
+      setIsCustom.on();
+      return;
+    }
+    setIsCustom.off();
 
     switch (val) {
       case Permission.NoAccess:
@@ -147,58 +148,68 @@ export const SimpleLevelPermissionOption = ({
   };
 
   return (
-    <div
-      className={twMerge(
-        "rounded-md bg-mineshaft-800 px-10 py-6",
-        selectedPermissionCategory !== Permission.NoAccess && "border-l-2 border-primary-600"
-      )}
-    >
-      <div className="flex items-center space-x-4">
-        <div>
-          <FontAwesomeIcon icon={icon} className="text-4xl" />
-        </div>
-        <div className="flex flex-grow flex-col">
-          <div className="mb-1 text-lg font-medium">{title}</div>
-          <div className="text-xs font-light">{subtitle}</div>
-        </div>
-        <div>
+    <>
+      <Tr
+        className="h-10 cursor-pointer transition-colors duration-300 hover:bg-mineshaft-700"
+        onClick={() => setIsRowExpanded.toggle()}
+      >
+        <Td>
+          <FontAwesomeIcon icon={isRowExpanded ? faChevronDown : faChevronRight} />
+        </Td>
+        <Td>{title}</Td>
+        <Td>
           <Select
-            defaultValue={Permission.NoAccess}
-            isDisabled={isNonEditable}
             value={selectedPermissionCategory}
+            className="w-40 bg-mineshaft-600"
+            dropdownContainerClassName="border border-mineshaft-600 bg-mineshaft-800"
             onValueChange={handlePermissionChange}
+            isDisabled={!isEditable}
           >
             <SelectItem value={Permission.NoAccess}>No Access</SelectItem>
             <SelectItem value={Permission.ReadOnly}>Read Only</SelectItem>
             <SelectItem value={Permission.FullAccess}>Full Access</SelectItem>
             <SelectItem value={Permission.Custom}>Custom</SelectItem>
           </Select>
-        </div>
-      </div>
-      <motion.div
-        initial={false}
-        animate={{ height: isCustom ? "2.5rem" : 0, paddingTop: isCustom ? "1rem" : 0 }}
-        className="grid auto-cols-min grid-flow-col gap-8 overflow-hidden"
-      >
-        {isCustom &&
-          getPermissionList(formName).map(({ action, label }) => (
-            <Controller
-              name={`permissions.${formName}.${action}`}
-              key={`permissions.${formName}.${action}`}
-              control={control}
-              render={({ field }) => (
-                <Checkbox
-                  isChecked={field.value}
-                  onCheckedChange={field.onChange}
-                  id={`permissions.${formName}.${action}`}
-                  isDisabled={isNonEditable}
-                >
-                  {label}
-                </Checkbox>
-              )}
-            />
-          ))}
-      </motion.div>
-    </div>
+        </Td>
+      </Tr>
+      {isRowExpanded && (
+        <Tr>
+          <Td
+            colSpan={3}
+            className={`bg-bunker-600 px-0 py-0 ${isRowExpanded && " border-mineshaft-500 p-8"}`}
+          >
+            <div className="grid grid-cols-3 gap-4">
+              {getPermissionList(formName).map(({ action, label }) => {
+                return (
+                  <Controller
+                    name={`permissions.${formName}.${action}`}
+                    key={`permissions.${formName}.${action}`}
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        isChecked={field.value}
+                        onCheckedChange={(e) => {
+                          if (!isEditable) {
+                            createNotification({
+                              type: "error",
+                              text: "Failed to update default role"
+                            });
+                            return;
+                          }
+                          field.onChange(e);
+                        }}
+                        id={`permissions.${formName}.${action}`}
+                      >
+                        {label}
+                      </Checkbox>
+                    )}
+                  />
+                );
+              })}
+            </div>
+          </Td>
+        </Tr>
+      )}
+    </>
   );
 };
